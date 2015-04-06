@@ -90,7 +90,7 @@ class Main:
     @command("sync")
     def do_sync(self):
         yield from imports.checkout(
-            self.runtime, self.scope, self.imports, self.runtime.root)
+            self.runtime, self.scope, self.imports, self.runtime.sync_dir)
 
     @command('reup')
     def do_reup(self):
@@ -135,7 +135,7 @@ class Main:
     @command('clean')
     def do_clean(self):
         yield from imports.checkout(
-            self.runtime, self.scope, {}, self.runtime.root)
+            self.runtime, self.scope, {}, self.runtime.sync_dir)
 
 
 def get_version():

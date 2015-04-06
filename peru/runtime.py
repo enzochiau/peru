@@ -14,23 +14,15 @@ from . import plugin
 
 class Runtime:
     def __init__(self, args, env):
-        peru_file_name = env.get('PERU_FILE_NAME',
-                                 parser.DEFAULT_PERU_FILE_NAME)
-        self.peru_file = find_peru_file(os.getcwd(), peru_file_name)
+        self._set_paths(args, env)
 
-        self.root = os.path.dirname(self.peru_file)
+        compat.makedirs(self.state_dir)
+        self.cache = cache.Cache(self.cache_dir)
 
-        self.peru_dir = env.get(
-            'PERU_DIR', os.path.join(self.root, '.peru'))
-        compat.makedirs(self.peru_dir)
-
-        cache_dir = env.get('PERU_CACHE', os.path.join(self.peru_dir, 'cache'))
-        self.cache = cache.Cache(cache_dir)
-
-        self._tmp_root = os.path.join(self.peru_dir, 'tmp')
+        self._tmp_root = os.path.join(self.state_dir, 'tmp')
         compat.makedirs(self._tmp_root)
 
-        self.overrides = KeyVal(os.path.join(self.peru_dir, 'overrides'),
+        self.overrides = KeyVal(os.path.join(self.state_dir, 'overrides'),
                                 self._tmp_root)
 
         self.force = args['--force']
@@ -54,6 +46,53 @@ class Runtime:
 
         self.display = get_display(args)
 
+    def _set_paths(self, args, env):
+        explicit_peru_file = self._get_explicit_peru_file(args, env)
+        explicit_sync_dir = self._get_explicit_sync_dir(args, env)
+        if (explicit_peru_file is None) != (explicit_sync_dir is None):
+            raise PrintableError(
+                'If the peru file or the sync dir is set, the other must also '
+                'be set.')
+        if explicit_peru_file:
+            self.peru_file = explicit_peru_file
+            self.sync_dir = explicit_sync_dir
+        else:
+            self.peru_file = find_peru_file(
+                os.getcwd(), parser.DEFAULT_PERU_FILE_NAME)
+            self.sync_dir = os.path.dirname(self.peru_file)
+        self.state_dir = (self._get_explicit_state_dir(args, env) or
+                          os.path.join(self.sync_dir, '.peru'))
+        self.cache_dir = (self._get_explicit_cache_dir(args, env) or
+                          os.path.join(self.state_dir, 'cache'))
+
+    def _get_explicit_peru_file(self, args, env):
+        if '--peru-file' in args:
+            return args['--peru-file']
+        if 'PERU_FILE' in env:
+            return env['PERU_FILE']
+        return None
+
+    def _get_explicit_sync_dir(self, args, env):
+        if '--sync-dir' in args:
+            return args['--sync-dir']
+        if 'PERU_SYNC_DIR' in env:
+            return env['PERU_SYNC_DIR']
+        return None
+
+    def _get_explicit_state_dir(self, args, env):
+        if '--state-dir' in args:
+            return args['--state-dir']
+        if 'PERU_STATE_DIR' in env:
+            return env['PERU_STATE_DIR']
+        return None
+
+    def _get_explicit_cache_dir(self, args, env):
+        if '--cache-dir' in args:
+            return args['--cache-dir']
+        if 'PERU_CACHE_DIR' in env:
+            return env['PERU_CACHE_DIR']
+        return None
+
     def tmp_dir(self):
         dir = tempfile.TemporaryDirectory(dir=self._tmp_root)
         return dir
@@ -66,7 +105,7 @@ class Runtime:
             # to be relative (for example, so a whole workspace can be moved as
             # a group while preserving all the overrides). So reinterpret all
             # relative paths from the project root.
-            path = os.path.relpath(path, start=self.root)
+            path = os.path.relpath(path, start=self.sync_dir)
         self.overrides[name] = path
 
     def get_override(self, name):
@@ -77,12 +116,12 @@ class Runtime:
             # Relative paths are stored relative to the project root.
             # Reinterpret them relative to the cwd. See the above comment in
             # set_override.
-            path = os.path.relpath(os.path.join(self.root, path))
+            path = os.path.relpath(os.path.join(self.sync_dir, path))
         return path
 
     def get_plugin_context(self):
         return plugin.PluginContext(
-            cwd=self.root,
+            cwd=self.sync_dir,
             plugin_cache_root=self.cache.plugins_root,
             parallelism_semaphore=self.fetch_semaphore,
             plugin_cache_locks=self.plugin_cache_locks,
