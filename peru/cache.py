@@ -5,6 +5,7 @@ import os
 import pathlib
 import re
 import subprocess
+import sys
 
 from .compat import makedirs
 from .error import PrintableError
@@ -329,15 +330,18 @@ class Cache:
             return None
 
 
-def _format_file_lines(files):
+def _format_file_lines(files, max_lines=sys.maxsize):
     '''Given a list of filenames that we're about to print, limit it to a
     reasonable number of lines.'''
-    LINES_TO_SHOW = 10
-    if len(files) <= LINES_TO_SHOW:
-        lines = '\n'.join(files)
+    # LINES_TO_SHOW = 10
+    num_of_files = len(files)
+    if max_lines < 3:
+        max_lines = 3
+    if num_of_files > max_lines:
+        lines = ('\n'.join(files[:max_lines - 2]) +
+                 '\n...\n{} total'.format(num_of_files))
     else:
-        lines = ('\n'.join(files[:LINES_TO_SHOW-1]) +
-                 '\n...{} total'.format(len(files)))
+        lines = '\n'.join(files)
     return lines
 
 
