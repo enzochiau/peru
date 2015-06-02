@@ -10,7 +10,7 @@ from .rule import Rule
 from .scope import Scope
 
 
-DEFAULT_PERU_FILE_NAME = 'peru.yaml'
+DEFAULT_PERU_FILE_NAME = '.peru.yaml'
 
 
 class ParserError(PrintableError):
